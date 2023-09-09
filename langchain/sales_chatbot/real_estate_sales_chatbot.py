@@ -10,7 +10,7 @@ from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 
 
-def initialize_sales_bot(vector_store_dir: str="real_estates_sale"):
+def initialize_sales_bot(vector_store_dir: str="real_estates_sales"):
     db = FAISS.load_local(vector_store_dir, OpenAIEmbeddings())
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
     
@@ -50,7 +50,8 @@ def launch_gradio():
         chatbot=gr.Chatbot(height=600),
     )
 
-    demo.launch(share=True, server_name="0.0.0.0")
+    demo.launch(server_name="0.0.0.0")
+    # demo.launch(share=True, server_name="0.0.0.0")
 
 if __name__ == "__main__":
     # 初始化房产销售机器人

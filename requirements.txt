@@ -1,0 +1,6 @@
+openai
+backoff
+tiktoken
+gradio
+faiss-cpu
+langchain[llms]
