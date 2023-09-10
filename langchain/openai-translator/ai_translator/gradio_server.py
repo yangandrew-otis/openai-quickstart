@@ -32,7 +32,8 @@ def launch_gradio():
         allow_flagging="never"
     )
 
-    iface.launch(share=True, server_name="0.0.0.0")
+    # iface.launch(share=True, server_name="0.0.0.0")
+    iface.launch(server_name="0.0.0.0")
 
 def initialize_translator():
     # 解析命令行
