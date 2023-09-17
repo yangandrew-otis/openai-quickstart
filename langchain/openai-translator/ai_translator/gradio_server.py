@@ -1,3 +1,9 @@
+"""
+修改 config.yaml 的 model_name 和 glm_endpoint_url。然后启动：
+
+$ python3 ./ai_translator/gradio_server.py
+"""
+
 import sys
 import os
 import gradio as gr
@@ -42,10 +48,12 @@ def initialize_translator():
 
     # 初始化配置单例
     config = TranslationConfig()
-    config.initialize(args)    
+    config.initialize(args)
+    LOG.info(f'config.model_name: {config.model_name}')
+    LOG.info(f'config.glm_endpoint_url: {config.glm_endpoint_url}')
     # 实例化 PDFTranslator 类，并调用 translate_pdf() 方法
     global Translator
-    Translator = PDFTranslator(config.model_name)
+    Translator = PDFTranslator(config.model_name, config.glm_endpoint_url)
 
 
 if __name__ == "__main__":
