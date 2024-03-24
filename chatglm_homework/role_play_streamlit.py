@@ -166,10 +166,28 @@ def save_to_file():
     text_messages = filter_text_msg(st.session_state["history"])
     if text_messages:
         # 若有对话历史，则结合角色人设和对话历史
-        file_content = personas + '\n\n' + str(text_messages)
+        # file_content = personas + '\n\n' + str(text_messages)
+        # 让对话更可读
+        conversation = ''
+        for item in text_messages:
+            role = item['role']
+            content = item['content'].strip()  # 去除内容两侧的空白字符（包括换行符）
+            if content:  # 如果内容不为空
+                if role == 'user':
+                    conversation += '\n' + st.session_state['meta']['user_name'] + '\n'
+                elif role == 'assistant':
+                    conversation += '\n' + st.session_state['meta']['bot_name'] + '\n'
+                else:
+                    conversation += f"\n{role}:\n"
+                # 打印一个空行，作为不同发言之间的分隔
+                conversation += content + '\n'
+
+        file_content = (
+            '===人设===\n\n' + personas + '\n\n===对话历史===\n\n' + conversation
+        )
     else:
         # 若没有对话历史，则保存角色人设
-        file_content = personas
+        file_content = '===人设===\n\n' + personas
 
     if not file_content:
         st.error("生成文件")
