@@ -1,4 +1,5 @@
 """
+作业1
 一个简单的demo，调用CharacterGLM实现角色扮演，调用CogView生成图片，调用ChatGLM生成CogView所需的prompt。
 
 依赖：

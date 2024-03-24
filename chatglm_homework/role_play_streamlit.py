@@ -1,4 +1,5 @@
 """
+作业2
 一个简单的demo，调用CharacterGLM实现角色扮演，调用ChatGLM生成CogView所需的prompt。
 
 依赖：
@@ -30,7 +31,7 @@ from api import (
     generate_chat_scene_prompt,
     generate_role_appearance,
     get_characterglm_response,
-    generate_cogview_image,
+    generate_role_persona,
 )
 from data_types import TextMsg, ImageMsg, TextMsgList, MsgList, filter_text_msg
 
@@ -58,24 +59,18 @@ api_key = st.sidebar.text_input(
 )
 update_api_key(api_key)
 
-# 添加streamlit选项框，设置文生图风格，如二次元风格，动漫风格，古典主义，超现实主义
-style = st.sidebar.selectbox(
-    "风格",
-    ("二次元", "动漫", "古典", "超现实主义", "像素艺术", "抽象艺术"),
-    index=0,
-    key="style",
-)
-
 
 # 初始化
 if "history" not in st.session_state:
     st.session_state["history"] = []
 if "meta" not in st.session_state:
     st.session_state["meta"] = {
-        "user_info": "",
-        "bot_info": "",
         "bot_name": "",
+        "bot_fragment": "",
+        "bot_info": "",
         "user_name": "",
+        "user_fragment": "",
+        "user_info": "",
     }
 
 
@@ -85,10 +80,10 @@ def init_session():
 
 # 4个输入框，设置meta的4个字段
 meta_labels = {
-    "bot_name": "角色名",
-    "user_name": "用户名",
-    "bot_info": "角色人设",
-    "user_info": "用户人设",
+    "bot_name": "角色1",
+    "bot_fragment": "角色1信息",
+    "user_name": "角色2",
+    "user_fragment": "角色2信息",
 }
 
 # 2x2 layout
@@ -96,48 +91,48 @@ with st.container():
     col1, col2 = st.columns(2)
     with col1:
         st.text_input(
-            label="角色名",
+            label="角色1",
             key="bot_name",
             on_change=lambda: st.session_state["meta"].update(
                 bot_name=st.session_state["bot_name"]
             ),
-            help="模型所扮演的角色的名字，不可以为空",
+            help="模型所扮演的角色1的名字，不可以为空",
         )
         st.text_area(
-            label="角色人设",
-            key="bot_info",
+            label="角色1信息",
+            key="bot_fragment",
             on_change=lambda: st.session_state["meta"].update(
-                bot_info=st.session_state["bot_info"]
+                bot_fragment=st.session_state["bot_fragment"]
             ),
-            help="角色的详细人设信息，不可以为空",
+            help="角色1的详细人设信息，不可以为空",
         )
 
     with col2:
         st.text_input(
-            label="用户名",
-            value="用户",
+            label="角色2",
             key="user_name",
             on_change=lambda: st.session_state["meta"].update(
                 user_name=st.session_state["user_name"]
             ),
-            help="用户的名字，默认为用户",
+            help="模型所扮演的角色1的名字，不可以为空",
         )
         st.text_area(
-            label="用户人设",
-            value="",
-            key="user_info",
+            label="角色2信息",
+            key="user_fragment",
             on_change=lambda: st.session_state["meta"].update(
-                user_info=st.session_state["user_info"]
+                user_fragment=st.session_state["user_fragment"]
             ),
-            help="用户的详细人设信息，可以为空",
+            help="角色2的详细人设信息，不可以为空",
         )
 
 
 def verify_meta() -> bool:
-    # 检查`角色名`和`角色人设`是否空，若为空，则弹出提醒
+    # 检查`角色1,2`和`角色1,2人设`是否空，若为空，则弹出提醒
     if (
         st.session_state["meta"]["bot_name"] == ""
-        or st.session_state["meta"]["bot_info"] == ""
+        or st.session_state["meta"]["bot_fragment"] == ""
+        or st.session_state["meta"]["user_name"] == ""
+        or st.session_state["meta"]["user_fragment"] == ""
     ):
         st.error("角色名和角色人设不能为空")
         return False
@@ -145,62 +140,73 @@ def verify_meta() -> bool:
         return True
 
 
-def draw_new_image():
-    """生成一张图片，并展示在页面上"""
+def save_to_file():
+    """保存到文件"""
     if not verify_meta():
         return
     text_messages = filter_text_msg(st.session_state["history"])
     if text_messages:
-        # 若有对话历史，则结合角色人设和对话历史生成图片
-        image_prompt = "".join(
+        # 若有对话历史，则结合角色人设和对话历史
+        file_content = "".join(
             generate_chat_scene_prompt(
                 text_messages[-10:], meta=st.session_state["meta"]
             )
         )
     else:
-        # 若没有对话历史，则根据角色人设生成图片
-        image_prompt = "".join(
-            generate_role_appearance(st.session_state["meta"]["bot_info"])
+        # 若没有对话历史，则保存角色人设
+        file_content = "\n".join(
+            [
+                'bot_name:',
+                st.session_state["meta"]["bot_name"],
+                'bot_info:',
+                st.session_state["meta"]["bot_info"],
+                '\nuser_name:',
+                st.session_state["meta"]["user_name"],
+                'user_info:',
+                st.session_state["meta"]["user_info"],
+            ]
         )
 
-    if not image_prompt:
-        st.error("调用chatglm生成Cogview prompt出错")
+    if not file_content:
+        st.error("生成文件")
         return
 
-    # 加上风格选项
-    # image_prompt = '二次元风格。' + image_prompt.strip()
-    image_prompt = style + '风格。' + image_prompt.strip()
+    print(f"\n\nfile_content: {file_content}")
 
-    print(f"image_prompt = {image_prompt}")
-    n_retry = 3
-    st.markdown("正在生成图片，请稍等...")
-    for i in range(n_retry):
-        try:
-            img_url = generate_cogview_image(image_prompt)
-        except Exception as e:
-            if i < n_retry - 1:
-                st.error("遇到了一点小问题，重试中...")
-            else:
-                st.error("又失败啦，点击【生成图片】按钮可再次重试")
-                return
-        else:
-            break
-    img_msg = ImageMsg({"role": "image", "image": img_url, "caption": image_prompt})
-    # 若history的末尾有图片消息，则替换它，（重新生成）
-    # 否则，append（新增）
-    while (
-        st.session_state["history"]
-        and st.session_state["history"][-1]["role"] == "image"
-    ):
-        st.session_state["history"].pop()
-    st.session_state["history"].append(img_msg)
-    st.rerun()
+    # 新建chat_history.txt, 将image_prompt保存到文件中
+    with open("chat_history.txt", "w", encoding="utf-8") as f:
+        f.write(file_content)
+
+    # n_retry = 3
+    # st.markdown("正在生成图片，请稍等...")
+    # for i in range(n_retry):
+    #     try:
+    #         img_url = generate_cogview_image(image_prompt)
+    #     except Exception as e:
+    #         if i < n_retry - 1:
+    #             st.error("遇到了一点小问题，重试中...")
+    #         else:
+    #             st.error("又失败啦，点击【生成图片】按钮可再次重试")
+    #             return
+    #     else:
+    #         break
+    # img_msg = ImageMsg({"role": "image", "image": img_url, "caption": image_prompt})
+    # # 若history的末尾有图片消息，则替换它，（重新生成）
+    # # 否则，append（新增）
+    # while (
+    #     st.session_state["history"]
+    #     and st.session_state["history"][-1]["role"] == "image"
+    # ):
+    #     st.session_state["history"].pop()
+    # st.session_state["history"].append(img_msg)
+    # st.rerun()
 
 
 button_labels = {
+    "gen_info": "生成人设",
     "clear_meta": "清空人设",
     "clear_history": "清空对话历史",
-    "gen_picture": "生成图片",
+    "save_file": "保存文件",
 }
 if debug:
     button_labels.update(
@@ -221,10 +227,12 @@ with st.container():
         clear_meta = st.button(button_labels["clear_meta"], key="clear_meta")
         if clear_meta:
             st.session_state["meta"] = {
-                "user_info": "",
-                "bot_info": "",
                 "bot_name": "",
+                "bot_fragment": "",
+                "bot_info": "",
                 "user_name": "",
+                "user_fragment": "",
+                "user_info": "",
             }
             st.rerun()
 
@@ -234,8 +242,11 @@ with st.container():
             init_session()
             st.rerun()
 
-    with button_key_to_col["gen_picture"]:
-        gen_picture = st.button(button_labels["gen_picture"], key="gen_picture")
+    with button_key_to_col["gen_info"]:
+        gen_info = st.button(button_labels["gen_info"], key="gen_info")
+
+    with button_key_to_col["save_file"]:
+        save_file = st.button(button_labels["save_file"], key="save_file")
 
     if debug:
         with button_key_to_col["show_api_key"]:
@@ -268,10 +279,14 @@ for msg in st.session_state["history"]:
     else:
         raise Exception("Invalid role")
 
+if gen_info:
+    bot_info = "".join(generate_role_persona(st.session_state["meta"]["bot_fragment"]))
+    st.session_state["meta"].update(bot_info=bot_info)
+    user_info = "".join(generate_role_persona(st.session_state["meta"]["user_fragment"]))
+    st.session_state["meta"].update(user_info=user_info)
 
-if gen_picture:
-    draw_new_image()
-
+if save_file:
+    save_to_file()
 
 with st.chat_message(name="user", avatar="user"):
     input_placeholder = st.empty()
