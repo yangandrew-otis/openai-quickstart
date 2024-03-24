@@ -5,8 +5,8 @@ from translator.translation_chain import TranslationChain
 from utils import LOG
 
 class PDFTranslator:
-    def __init__(self, model_name: str):
-        self.translate_chain = TranslationChain(model_name)
+    def __init__(self, model_name: str, glm_endpoint_url: str):
+        self.translate_chain = TranslationChain(model_name, glm_endpoint_url)
         self.pdf_parser = PDFParser()
         self.writer = Writer()
 
@@ -23,6 +23,7 @@ class PDFTranslator:
             for content_idx, content in enumerate(page.contents):
                 # Translate content.original
                 translation, status = self.translate_chain.run(content, source_language, target_language)
+                LOG.info(f'translation:\n{translation}')
                 # Update the content in self.book.pages directly
                 self.book.pages[page_idx].contents[content_idx].set_translation(translation, status)
         
