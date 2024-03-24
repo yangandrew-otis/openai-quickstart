@@ -148,7 +148,7 @@ def verify_meta() -> bool:
 def save_to_file():
     """保存到文件"""
     if not verify_meta():
-        return
+        return ''
 
     personas = "\n".join(
         [
@@ -183,7 +183,7 @@ def save_to_file():
                 conversation += content + '\n'
 
         file_content = (
-            '===人设===\n\n' + personas + '\n\n===对话历史===\n\n' + conversation
+            '===人设===\n\n' + personas + '\n\n===对话历史===\n' + conversation
         )
     else:
         # 若没有对话历史，则保存角色人设
@@ -191,7 +191,7 @@ def save_to_file():
 
     if not file_content:
         st.error("生成文件")
-        return
+        return ''
 
     print(f"\n\nfile_content: {file_content}")
 
@@ -199,29 +199,7 @@ def save_to_file():
     with open("chat_history.txt", "w", encoding="utf-8") as f:
         f.write(file_content)
 
-    # n_retry = 3
-    # st.markdown("正在生成图片，请稍等...")
-    # for i in range(n_retry):
-    #     try:
-    #         img_url = generate_cogview_image(image_prompt)
-    #     except Exception as e:
-    #         if i < n_retry - 1:
-    #             st.error("遇到了一点小问题，重试中...")
-    #         else:
-    #             st.error("又失败啦，点击【生成图片】按钮可再次重试")
-    #             return
-    #     else:
-    #         break
-    # img_msg = ImageMsg({"role": "image", "image": img_url, "caption": image_prompt})
-    # # 若history的末尾有图片消息，则替换它，（重新生成）
-    # # 否则，append（新增）
-    # while (
-    #     st.session_state["history"]
-    #     and st.session_state["history"][-1]["role"] == "image"
-    # ):
-    #     st.session_state["history"].pop()
-    # st.session_state["history"].append(img_msg)
-    # st.rerun()
+    return file_content
 
 
 button_labels = {
@@ -432,17 +410,12 @@ if gen_exchange:
         gen_response_2()
         gen_response_1()
 
-    # response_stream = get_characterglm_response(
-    #     filter_text_msg(st.session_state["swapped_history"]),
-    #     meta={
-    #         'bot_name': st.session_state['meta']['user_name'],
-    #         'bot_info': st.session_state['meta']['user_info'],
-    #         'user_name': st.session_state['meta']['bot_name'],
-    #         'user_info': st.session_state['meta']['bot_info'],
-    #     },
-    # )
-    # bot_response = output_stream_response(response_stream, message_placeholder)
 
+st.download_button(
+    label='下载文件',
+    data=save_to_file(),
+    file_name='chat_history.txt',
+)
 
 def start_chat():
     query = st.chat_input("开始对话吧")
@@ -477,4 +450,4 @@ def start_chat():
             )
 
 
-start_chat()
+# start_chat()
