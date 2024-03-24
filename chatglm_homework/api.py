@@ -182,6 +182,7 @@ def generate_role_persona(role_profile: str) -> Generator[str, None, None]:
 
     instruction = f"""
 请从下列文本中，生成角色人设。如果文本中有多个角色，选取其中最主要的一个任务生成角色人设。尽量用短语描写，而不是完整的句子。可以推测人物的性别、年龄、性格、喜好等。
+注意，默认人设是外向的，健谈的。保留尽可能丰富的人设信息。
 
 文本：
 {role_profile}

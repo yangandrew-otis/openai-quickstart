@@ -1,6 +1,6 @@
 """
 作业2
-一个简单的demo，调用CharacterGLM实现角色扮演，调用ChatGLM生成CogView所需的prompt。
+一个简单的demo，调用CharacterGLM实现角色扮演，调用ChatGLM生成所需的prompt。
 
 依赖：
 pyjwt
@@ -13,6 +13,8 @@ python-dotenv
 ```bash
 streamlit run characterglm_api_demo_streamlit.py
 ```
+
+点击“生成一轮对话”。第一次点击时，会调用glm生成人设，再生成一轮对话。使用README.md中的人设，可以生成对话。点击“保存文件”，在本地保存文件。
 """
 
 import os
@@ -63,6 +65,8 @@ update_api_key(api_key)
 # 初始化
 if "history" not in st.session_state:
     st.session_state["history"] = []
+if "swapped_history" not in st.session_state:
+    st.session_state["swapped_history"] = []
 if "meta" not in st.session_state:
     st.session_state["meta"] = {
         "bot_name": "",
@@ -76,6 +80,7 @@ if "meta" not in st.session_state:
 
 def init_session():
     st.session_state["history"] = []
+    st.session_state["swapped_history"] = []
 
 
 # 4个输入框，设置meta的4个字段
@@ -144,28 +149,27 @@ def save_to_file():
     """保存到文件"""
     if not verify_meta():
         return
+
+    personas = "\n".join(
+        [
+            'bot_name:',
+            st.session_state["meta"]["bot_name"],
+            'bot_info:',
+            st.session_state["meta"]["bot_info"],
+            '\nuser_name:',
+            st.session_state["meta"]["user_name"],
+            'user_info:',
+            st.session_state["meta"]["user_info"],
+        ]
+    )
+
     text_messages = filter_text_msg(st.session_state["history"])
     if text_messages:
         # 若有对话历史，则结合角色人设和对话历史
-        file_content = "".join(
-            generate_chat_scene_prompt(
-                text_messages[-10:], meta=st.session_state["meta"]
-            )
-        )
+        file_content = personas + '\n\n' + str(text_messages)
     else:
         # 若没有对话历史，则保存角色人设
-        file_content = "\n".join(
-            [
-                'bot_name:',
-                st.session_state["meta"]["bot_name"],
-                'bot_info:',
-                st.session_state["meta"]["bot_info"],
-                '\nuser_name:',
-                st.session_state["meta"]["user_name"],
-                'user_info:',
-                st.session_state["meta"]["user_info"],
-            ]
-        )
+        file_content = personas
 
     if not file_content:
         st.error("生成文件")
@@ -205,6 +209,7 @@ def save_to_file():
 button_labels = {
     "gen_info": "生成人设",
     "clear_meta": "清空人设",
+    "gen_exchange": "生成一轮对话",
     "clear_history": "清空对话历史",
     "save_file": "保存文件",
 }
@@ -245,6 +250,9 @@ with st.container():
     with button_key_to_col["gen_info"]:
         gen_info = st.button(button_labels["gen_info"], key="gen_info")
 
+    with button_key_to_col["gen_exchange"]:
+        gen_exchange = st.button(button_labels["gen_exchange"], key="gen_exchange")
+
     with button_key_to_col["save_file"]:
         save_file = st.button(button_labels["save_file"], key="save_file")
 
@@ -258,11 +266,22 @@ with st.container():
             show_meta = st.button(button_labels["show_meta"], key="show_meta")
             if show_meta:
                 print(f"meta = {st.session_state['meta']}")
+                # test
+                print('swapped meta =')
+                print(
+                    {
+                        'bot_name': st.session_state['meta']['user_name'],
+                        'bot_info': st.session_state['meta']['user_info'],
+                        'user_name': st.session_state['meta']['bot_name'],
+                        'user_info': st.session_state['meta']['bot_info'],
+                    }
+                )
 
         with button_key_to_col["show_history"]:
             show_history = st.button(button_labels["show_history"], key="show_history")
             if show_history:
                 print(f"history = {st.session_state['history']}")
+                print(f"swapped_history = {st.session_state['swapped_history']}")
 
 
 # 展示对话历史
@@ -279,15 +298,24 @@ for msg in st.session_state["history"]:
     else:
         raise Exception("Invalid role")
 
-if gen_info:
+
+def gen_bot_and_user_info():
+    """生成bot和user的persona"""
     bot_info = "".join(generate_role_persona(st.session_state["meta"]["bot_fragment"]))
     st.session_state["meta"].update(bot_info=bot_info)
-    user_info = "".join(generate_role_persona(st.session_state["meta"]["user_fragment"]))
+    user_info = "".join(
+        generate_role_persona(st.session_state["meta"]["user_fragment"])
+    )
     st.session_state["meta"].update(user_info=user_info)
+
+
+if gen_info:
+    gen_bot_and_user_info()
 
 if save_file:
     save_to_file()
 
+# 对话行
 with st.chat_message(name="user", avatar="user"):
     input_placeholder = st.empty()
 with st.chat_message(name="assistant", avatar="assistant"):
@@ -295,10 +323,107 @@ with st.chat_message(name="assistant", avatar="assistant"):
 
 
 def output_stream_response(response_stream: Iterator[str], placeholder):
+    """将get_characterglm_response()的输出打印到placeholder"""
     content = ""
     for content in itertools.accumulate(response_stream):
         placeholder.markdown(content)
     return content
+
+
+def gen_response_1():
+    """生成机器（角色1）的回答"""
+    response_stream = get_characterglm_response(
+        filter_text_msg(st.session_state["history"]),
+        meta=st.session_state["meta"],
+    )
+    bot_response = output_stream_response(response_stream, message_placeholder)
+    print('gen_response_1():', bot_response)
+
+    if not bot_response:
+        message_placeholder.markdown("生成出错")
+        st.session_state["history"].pop()
+        st.session_state["swapped_history"].pop()
+    else:
+        st.session_state["history"].append(
+            TextMsg({"role": "assistant", "content": bot_response})
+        )
+        st.session_state["swapped_history"].append(
+            TextMsg({"role": "user", "content": bot_response})
+        )
+
+
+def gen_response_2():
+    """生成用户（角色2）的回答"""
+    response_stream = get_characterglm_response(
+        filter_text_msg(st.session_state["swapped_history"]),
+        meta={
+            'bot_name': st.session_state['meta']['user_name'],
+            'bot_info': st.session_state['meta']['user_info'],
+            'user_name': st.session_state['meta']['bot_name'],
+            'user_info': st.session_state['meta']['bot_info'],
+        },
+    )
+    bot_response = output_stream_response(response_stream, input_placeholder)
+    print('gen_response_2():', bot_response)
+
+    if not bot_response:
+        input_placeholder.markdown("生成出错")
+        st.session_state["history"].pop()
+        st.session_state["swapped_history"].pop()
+    else:
+        st.session_state["history"].append(
+            TextMsg({"role": "user", "content": bot_response})
+        )
+        st.session_state["swapped_history"].append(
+            TextMsg({"role": "assistant", "content": bot_response})
+        )
+
+
+if gen_exchange:
+    if not verify_meta():
+        st.error("verify_meta() failed")
+    if not api.API_KEY:
+        st.error("未设置API_KEY")
+
+    if (
+        st.session_state["meta"]['bot_info'] == ''
+        or st.session_state["meta"]['user_info'] == ''
+    ):
+        gen_bot_and_user_info()
+
+    if len(st.session_state["history"]) == 0:
+        # 第一轮对话
+        # 对话的第一句话
+        FIRST_LINE = (
+            '你好，见到你很高兴。我们做个自我介绍吧。我是'
+            + st.session_state["meta"]['user_name']
+            + '。'
+            + st.session_state["meta"]['user_info']
+        )
+
+        input_placeholder.markdown(FIRST_LINE)
+        st.session_state["history"].append(
+            TextMsg({"role": "user", "content": FIRST_LINE})
+        )
+        st.session_state["swapped_history"].append(
+            TextMsg({"role": "assistant", "content": FIRST_LINE})
+        )
+        gen_response_1()
+    else:
+        # 之后的对话
+        gen_response_2()
+        gen_response_1()
+
+    # response_stream = get_characterglm_response(
+    #     filter_text_msg(st.session_state["swapped_history"]),
+    #     meta={
+    #         'bot_name': st.session_state['meta']['user_name'],
+    #         'bot_info': st.session_state['meta']['user_info'],
+    #         'user_name': st.session_state['meta']['bot_name'],
+    #         'user_info': st.session_state['meta']['bot_info'],
+    #     },
+    # )
+    # bot_response = output_stream_response(response_stream, message_placeholder)
 
 
 def start_chat():
@@ -313,6 +438,9 @@ def start_chat():
 
         input_placeholder.markdown(query)
         st.session_state["history"].append(TextMsg({"role": "user", "content": query}))
+        st.session_state["swapped_history"].append(
+            TextMsg({"role": "assistant", "content": query})
+        )
 
         response_stream = get_characterglm_response(
             filter_text_msg(st.session_state["history"]), meta=st.session_state["meta"]
@@ -321,9 +449,13 @@ def start_chat():
         if not bot_response:
             message_placeholder.markdown("生成出错")
             st.session_state["history"].pop()
+            st.session_state["swapped_history"].pop()
         else:
             st.session_state["history"].append(
                 TextMsg({"role": "assistant", "content": bot_response})
+            )
+            st.session_state["swapped_history"].append(
+                TextMsg({"role": "user", "content": bot_response})
             )
 
 
